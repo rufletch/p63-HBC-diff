@@ -1,0 +1,182 @@
+---
+title: "Transcription Factor co-expression"
+author: "Davide Risso, Diya Das"
+date: "`r Sys.Date()`"
+output:
+html_document:
+code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align="center", cache=TRUE, error=FALSE, message=FALSE, warning=FALSE, results="markup", autodep = TRUE)
+
+options(getClass.msg=FALSE) #get rid of annoying messages about cache until fixed internally in R
+NMF::nmf.options(grid.patch=TRUE) #get rid of blank page in heatmap pdf
+
+library(NMF)
+library(matrixStats)
+library(igraph)
+
+legend.col <- function(col, lev){
+  opar <- par
+  n <- length(col)
+  bx <- par("usr")
+  box.cx <- c(bx[2] + (bx[2] - bx[1]) / 1000,
+              bx[2] + (bx[2] - bx[1]) / 1000 + (bx[2] - bx[1]) / 50)
+  box.cy <- c(bx[3], bx[3])
+  box.sy <- (bx[4] - bx[3]) / n
+  xx <- rep(box.cx, each = 2)
+  
+  par(xpd = TRUE)
+  for(i in 1:n){
+    yy <- c(box.cy[1] + (box.sy * (i - 1)),
+            box.cy[1] + (box.sy * (i)),
+            box.cy[1] + (box.sy * (i)),
+            box.cy[1] + (box.sy * (i - 1)))
+    polygon(xx, yy, col = col[i], border = col[i])
+  }
+  par(new = TRUE)
+  plot(0, 0, type = "n",
+       ylim = c(min(lev), max(lev)),
+       yaxt = "n", ylab = "",
+       xaxt = "n", xlab = "",
+       frame.plot = FALSE)
+  axis(side = 4, las = 2, tick = FALSE, line = .25)
+  par <- opar
+}
+## source: https://aurelienmadouasse.wordpress.com/2012/01/13/legend-for-a-continuous-color-scale-in-r/
+```
+
+We start from the normalized expression of  transcription factors (TFs) in the OE data.
+Input include the inferred pseudo-time by Slingshot and the cluster labels by clusterExperiment.
+
+We want to visualize the correlation of the TFs and find "modules" of co-regulated TFs. This should be visualized by a co-regulation network.
+
+# All TFs
+
+```{r}
+expt_str <- "oeHBCdiff"
+clust_dir <- file.path("../output/clust", expt_str)
+viz_dir <- file.path("../output/viz", expt_str)
+DE_dir <- file.path("../output/DE", expt_str)
+
+load(file.path(clust_dir, paste0(expt_str, "_lineageData.Rda")))
+load(file.path(clust_dir, paste0(expt_str,"_slingshot.Rda")))
+
+nlm_tf <- nlm[intersect(unlist(read.table("../ref/ATFDB_mm_TF.txt")), rownames(nlm)),]
+slm_tf <- slm[intersect(unlist(read.table("../ref/ATFDB_mm_TF.txt")), rownames(slm)),]
+```
+
+To select a reasonable threshold, we scramble the entries of the matrix and we compute the maximum correlation.
+
+```{r}
+set.seed(21421)
+mm <- 0
+for(i in seq_len(10)){
+  idx <- replicate(NCOL(nlm_tf), sample(seq_len(NROW(nlm_tf))))
+  random_mat <- matrix(nlm_tf[idx], ncol=NCOL(nlm_tf), nrow=NROW(nlm_tf))
+  random_cor <- cor(t(random_mat))
+  diag(random_cor) <- 0
+  mm <- max(mm, max(random_cor))
+}
+print(mm)
+
+
+mm <- 0
+for(i in seq_len(10)){
+  idx <- replicate(NCOL(slm_tf), sample(seq_len(NROW(slm_tf))))
+  random_mat <- matrix(slm_tf[idx], ncol=NCOL(slm_tf), nrow=NROW(slm_tf))
+  random_cor <- cor(t(random_mat))
+  diag(random_cor) <- 0
+  mm <- max(mm, max(random_cor))
+}
+print(mm)
+```
+
+Using a cutoff of 0.3 on correlation, we construct a network where each node is a gene and there is an edge if the genes have a correlation greater than the threshold.
+
+* Vertices color-coded by clustering of the correlation matrix.
+* Edge width proportional to correlation
+* Vertex size proportional to the max average expression (for each cluster take the average expression, then take the max -- like mean expression but not penalizing genes that are high only in small clusters)
+* Only name of the genes with mean expression greater than 5
+
+
+
+```{r}
+# DE TFs - OneVAll
+de_NL <- read.table(paste0(DE_dir, "/NL_DE_oneVall_limma_500.txt"), stringsAsFactors = FALSE)
+de_SL <- read.table(paste0(DE_dir, "/SL_DE_oneVall_limma_500.txt"), stringsAsFactors = FALSE)
+
+tf_network <- function(mat_tf, de, col.pal, clus.labels, name){
+  var_tf <- mat_tf[intersect(de$Feature, rownames(mat_tf)),]
+  cors <- cor(t(var_tf))
+  tfs <- var_tf[which(rowSums(cors>.3)>=5),]
+  cor_mat <- cor(t(tfs))
+  cor_mat[lower.tri(cor_mat, diag=TRUE)] <- 0
+  cor_mat[cor_mat<0.3] <- 0
+  
+  graph <- graph.adjacency(cor_mat > 0.3, weighted=NULL, mode="upper")
+  idx <- names(which(degree(graph)>=5))
+  tfs <- mat_tf[idx,]
+  
+  cor_hm <- cor_mat <- cor(t(tfs))
+  cor_mat[lower.tri(cor_mat, diag=TRUE)] <- 0
+  cor_mat[cor_mat<0.3] <- 0
+  
+  graph <- graph.adjacency(cor_mat > 0.3, weighted=NULL, mode="upper")
+  coords <- layout_(graph, with_fr())
+  
+  size <- apply(tfs, 1, function(x) max(tapply(x, droplevels(clus.labels), mean)))
+  
+  E(graph)$weight<-t(cor_mat)[t(cor_mat)>0.3]
+  E(graph)$width <- E(graph)$weight*2
+  V(graph)$size <- size
+  names <- rownames(tfs)
+  names[size < 3] <- NA
+  V(graph)$label <- names
+  
+  cols_all <-apply(tfs,1, function(x) tapply(x, clus.labels, mean))
+  cols_all <- t(cols_all)
+  
+  par(mar=c(5.1 ,4.1 ,4.1, 2.1))
+  col_ranks <- t(apply(cols_all, 1, rank))
+  V(graph)$color <- "white"
+  png(filename=file.path(viz_dir, paste0(expt_str,"_DE_",name,"_rankbyclus0",i,"_white.png")), width=8, 
+      height=8, units="in", res=600, 
+      pointsize=12)
+  par(mar=c(5.1, 4.1, 4.1, 3))
+  plot(graph, layout=coords, vertex.label.cex=.5, vertex.label.color="black")
+  dev.off()
+  for(i in seq_along(levels(clus.labels))) {
+    cols = col_ranks[,i]
+    clID = levels(clus.labels)[i]
+    col_ramp2 <- colorRampPalette(c("navyblue","mediumblue","dodgerblue3","aquamarine4","green4","yellowgreen","yellow"))(ncol(cols_all))
+    pt_cols <- col_ramp2[cols]
+    V(graph)$color <- pt_cols
+    png(filename=file.path(viz_dir, paste0(expt_str,"_DE_",name,"_rankbyclus0",i,"_cl",clID,".png")), 
+        width=8, 
+        height=8, units="in", res=600, 
+        pointsize=12)
+    par(mar=c(5.1, 4.1, 4.1, 3))
+    plot(graph, layout=coords, vertex.label.cex=.5, vertex.label.color="black", main=paste("Cluster",clID, "color-coded by expression"))
+    legend.col(col=col_ramp2, lev=c(1,ncol(cols_all)))
+    dev.off()
+  }
+  
+  png(file=file.path(viz_dir, paste0(expt_str,"_DE_OneVall_",name,".png")),
+      width=8, 
+      height=8, units="in", res=600, 
+      pointsize=12)
+  cols <- apply(tfs, 1, function(x) which.max(tapply(x, clus.labels, mean)))
+  V(graph)$color <- col.pal[cols]
+  plot(graph, layout=coords, vertex.label.cex=.5, vertex.label.color="black", main="Color-coded by cluster label")
+  dev.off()
+}
+
+tf_network(nlm_tf, de_NL, colpalN, nclus.labels, "Neur")
+tf_network(slm_tf, de_SL, colpalS, sclus.labels, "Sus")
+```

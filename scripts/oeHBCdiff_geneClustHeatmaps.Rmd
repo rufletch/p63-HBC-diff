@@ -1,0 +1,161 @@
+---
+  title: "Heatmaps of Lineage Specific Gene Clustering"
+author: "Russell Fletcher and Diya Das"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+  code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+  
+```{r options, echo=FALSE, results="hide",mesasge=FALSE, error=FALSE,include=FALSE}
+knitr::opts_chunk$set(fig.align="center", cache=TRUE, error=FALSE, message=FALSE, warning=FALSE, results="hide")
+NMF::nmf.options(grid.patch=TRUE)
+library(clusterExperiment)
+library(RColorBrewer)
+
+expt_str <- "oeHBCdiff"
+clust_dir <- file.path("../output/clust", expt_str)
+DE_dir <- file.path("../output/DE", expt_str)
+gClust_dir <- file.path("../output/gClust", expt_str)
+
+load(file.path(clust_dir, paste0(expt_str,"_lineageData.Rda")))
+load(file.path(gClust_dir,paste0(expt_str,"_SL_geneCl_final.Rda")))
+load(file.path(gClust_dir,paste0(expt_str,"_NL_geneCl_final.Rda")))
+
+gcolpal <- c(brewer.pal(8,"Dark2")[-c(2,3,5)],brewer.pal(12,"Paired")[c(1,2,8,10,9)],brewer.pal(12,"Set3")[c(7,8,12)], brewer.pal(8, "Pastel2")[8], brewer.pal(11,"BrBG")[11], brewer.pal(11,"PiYG")[1], "cyan", "darkblue","darkorchid2", "brown1", "springgreen1", "deepskyblue4", "darkolivegreen","antiquewhite2")
+
+```
+
+
+
+```{r prep}
+
+NLgClList <- c("m1","m2","m5","m10","m16","m7","m13","m6","m9","m3","m11","m12","m17","m4","m8","m14","m15")
+SLgClList <- c("m1","m3","m7","m6","m11","m2","m4","m5","m8","m9","m10","m12")
+
+#####-----lists of gene cluster matrices
+NLgClMatList <- lapply(NLgClList, function(x){
+  NLgclm <- nlm[colnames(cegNL)[primaryClusterNamed(cegNL)==x],]
+  return(NLgclm)})
+SLgClMatList <- lapply(SLgClList, function(x){
+  SLgclm <- slm[colnames(cegSL)[primaryClusterNamed(cegSL)==x],]
+  return(SLgclm)
+})
+
+#####-----lineage specific matrices with all genes in order (manually ordered gene clusters)
+nlGeneOrderMat <- NLgClMatList[[1]]
+addGenestoMat <- lapply(NLgClMatList[2:length(NLgClMatList)], function(x) {
+  nlGeneOrderMat <<- rbind(nlGeneOrderMat, x)
+  return(nlGeneOrderMat)
+})
+
+slGeneOrderMat <- SLgClMatList[[1]]
+addGenestoMat <- lapply(SLgClMatList[2:length(SLgClMatList)], function(x) {
+  slGeneOrderMat <<- rbind(slGeneOrderMat, x)
+  return(slGeneOrderMat)
+})
+
+ccAll <- intersect(unlist(read.table ("../ref/cellCycle40.txt")),rownames(nlm))
+cc_scaled <- t(scale(t(cbind(nlm[ccAll,], slm[ccAll,setdiff(colnames(slm),colnames(nlm))]))))
+cc_z <- colMeans(cc_scaled)
+
+```
+
+
+```{r scaledGeneClusterHeatmaps}
+
+#####################----------NEURONAL LINEAGE GENE CLUSTER + cell cycle Heatmap
+
+x <- NLgClMatList[[1]]; tmp <- t(scale(t(x))); cellMean<-apply(tmp,2,mean); names(cellMean) <- colnames(nlm); DOmat <- as.matrix(cellMean)
+NLgClScaledMats <- lapply(NLgClMatList[2:length(NLgClMatList)], function(x) {
+  tmp <- t(scale(t(x)))
+  cellMean <- apply(tmp,2,mean)
+  names(cellMean) <- colnames(nlm)
+  DOmat1 <- as.matrix(cellMean)
+  DOmat <<- cbind(DOmat, DOmat1)
+  return(DOmat)
+})
+
+DOmat2 <- cbind(DOmat, rep(NA, 462))
+
+cellMean <- cc_z[colnames(nlm)]
+ccmat <- as.matrix(cellMean)
+DOmat2 <- cbind(DOmat2, ccmat)
+
+DOgclmat2 <- t(DOmat2)
+
+break_sm <- c(seq(0, quantile(DOgclmat2[DOgclmat2 > 0], .99, na.rm = TRUE), length = 25), max(DOgclmat2, na.rm = TRUE))
+breakv <- c(-rev(break_sm)[1:length(break_sm)-1],break_sm)
+
+pdf(file=file.path(gClust_dir, paste0(expt_str, "_NL_gCl_heatmap.pdf")), width=11, height=8.5)
+plotHeatmap(DOgclmat2, clusterSamples=F,clusterFeatures=F, breaks=breakv, sampleData=data.frame(clusters=nclus.labels), annRow= NLgClList, clusterLegend=list(clusters=colpalN, X2=gcolpal),main=paste("Neuronal Lineage Gene Sets by \n Developmental Order"), colorScale=seqPal3)  
+dev.off()
+
+#####################----------SUSTENTACULAR CELL LINEAGE GENE CLUSTER + cell cycle Heatmap
+x <- SLgClMatList[[1]]; tmp <- t(scale(t(x))); cellMean<-apply(tmp,2,mean); names(cellMean) <- colnames(slm); DOmat <- as.matrix(cellMean)
+SLgClScaledMats <- lapply(SLgClMatList[2:length(SLgClMatList)], function(x) {
+  tmp <- t(scale(t(x)))
+  cellMean <- apply(tmp,2,mean)
+  names(cellMean) <- colnames(slm)
+  DOmat1 <- as.matrix(cellMean)
+  DOmat <<- cbind(DOmat, DOmat1)
+  return(DOmat)
+})
+
+DOmat2 <- cbind(DOmat, rep(NA, 315))
+
+cellMean <- cc_z[colnames(slm)]
+ccmat <- as.matrix(cellMean)
+DOmat2 <- cbind(DOmat2, ccmat)
+
+DOgclmat2 <- t(DOmat2)
+
+pdf(file=file.path(gClust_dir, paste0(expt_str, "_SL_gCl_heatmap.pdf")), width=11, height=8.5)
+plotHeatmap(DOgclmat2, clusterSamples=F,clusterFeatures=F, breaks=breakv, sampleData=data.frame(clusters=sclus.labels), annRow= SLgClList, clusterLegend=list(clusters=colpalS, X2=gcolpal),main=paste("Sus Cell Lineage Gene Sets by \n Developmental Order"), colorScale=seqPal3)  
+dev.off()
+
+```
+
+
+```{r geneClusterHeatmapsAllGenes}
+
+##############-------------heatmaps of each lineage gene cluster genes ordered by gene clusters
+NLgClmat <- nlm[rownames(nlGeneOrderMat),]
+SLgClmat <- slm[rownames(slGeneOrderMat),]
+
+breakw <- c(min(NLgClmat), seq(0, quantile(NLgClmat[NLgClmat > 0], .99, na.rm = TRUE), length = 50), max(NLgClmat))
+
+NLgClusters <- droplevels(factor(primaryClusterNamed(cegNL)[primaryClusterNamed(cegNL)!= "-1"], levels = c("m1","m2","m5","m10","m16","m7","m13","m6","m9","m3","m11","m12","m17","m4","m8","m14","m15")))
+
+pdf(file=file.path(gClust_dir, paste0(expt_str, "_NL_NLgeneCl_HM.pdf")), width=11, height=8.5)
+plotHeatmap(NLgClmat, clusterSamples=F,clusterFeatures=F, breaks=breakw, sampleData=data.frame(clusters=nclus.labels), annRow= NLgClusters[order(NLgClusters)], clusterLegend=list(clusters=colpalN, X2=gcolpal),main=paste("Neuronal Lineage Gene Cluster Genes \n by Developmental Order")) 
+dev.off()
+
+pdf(file=file.path(gClust_dir, paste0(expt_str, "_SL_SLgeneCl_HM.pdf")), width=11, height=8.5)
+SLgClusters <- droplevels(factor(primaryClusterNamed(cegSL)[primaryClusterNamed(cegSL)!= "-1"], levels = c("m1","m3","m7","m6","m11","m2","m4","m5","m8","m9","m10","m12")))
+plotHeatmap(SLgClmat, clusterSamples=F,clusterFeatures=F, breaks=breakw, sampleData=data.frame(clusters=sclus.labels), annRow= SLgClusters[order(SLgClusters)], clusterLegend=list(clusters=colpalS, X2=gcolpal),main=paste("Sus Cell Lineage Gene Cluster Genes \n by Developmental Order")) 
+dev.off()
+
+###############-------------Switching genes and lineages:  
+NLSLgClmat <- nlm[rownames(slGeneOrderMat),]
+
+SLNLgClmat <- slm[rownames(nlGeneOrderMat),]
+
+###---Sus cell lineage genes in neuronal lineage
+pdf(file=file.path(gClust_dir, paste0(expt_str, "_NL_SLgeneCl_HM.pdf")), height=8.5, width=11)
+plotHeatmap(NLSLgClmat, clusterSamples=F,clusterFeatures=F, breaks=breakw, sampleData=data.frame(clusters=nclus.labels), annRow= SLgClusters[order(SLgClusters)], clusterLegend=list(clusters=colpalN, X2=gcolpal),main=paste("Neuronal Lineage, Sus Lineage Gene Cluster Genes \n by Developmental Order")) 
+dev.off()
+
+
+###---Neuronal lineage genes in sustentacular lineage
+pdf(file=file.path(gClust_dir, paste0(expt_str, "_SL_NLgeneCl_HM.pdf")), height=8.5, width=11)
+plotHeatmap(SLNLgClmat, clusterSamples=F,clusterFeatures=F, breaks=breakw, sampleData=data.frame(clusters=sclus.labels), annRow= NLgClusters[order(NLgClusters)], clusterLegend=list(clusters=colpalS, X2=gcolpal),main=paste("Sus Lineage, Neuronal Lineage Gene Cluster Genes \n by Developmental Order")) 
+dev.off()
+
+
+```
+

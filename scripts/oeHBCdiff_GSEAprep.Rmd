@@ -1,0 +1,68 @@
+---
+title: "oeHBCdiff preparing gene sets"
+author: "Davide Risso and Russell Fletcher"
+date: '`r Sys.Date()`'
+output:
+html_document:
+code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+  
+```{r options, echo=TRUE, results="markup",message=FALSE, error=FALSE}
+knitr::opts_chunk$set(cache=FALSE, fig.align="center", fig.width=10, error=TRUE,message=TRUE, echo=TRUE, warning=TRUE,results="markup")
+library(clusterExperiment)
+library(biomaRt)
+library(limma)
+```
+
+###Set-up and Loading
+``` {r loading&set-up}
+
+expt_str <- "oeHBCdiff"
+clust_dir <- file.path("../output/clust", expt_str)
+load(file.path(clust_dir, paste0(expt_str, "_cmmerged.Rda")))
+
+##--remove small clusters from the clusterExperiment object, leaving only the clusters used in the lineage analysis by slingshot
+cmobj2 <- cmobj[,!(primaryClusterNamed(cmobj) %in% c("-1","m6", "m13", "m16", "m17","m18"))]
+save(cmobj2, file=file.path(clust_dir, paste0(expt_str,"_finalClusterObject.Rda")))
+
+printf <- function(...) cat(sprintf(...))
+
+```
+
+###Prepare gene sets from MSigDB
+```{r prepare_geneSets}
+
+## MSigDB gene sets (halllmark + c2)
+geneSetsFiles <- c("mouse_c2_v5p1.rdata", "mouse_H_v5p1.rdata")
+for(fname in geneSetsFiles) {
+  if(!file.exists(file.path("../ref/MSigDB", fname))) {
+    printf("downloading gene set file %s...\n", fname)
+    system(paste0("wget -P ../ref/MSigDB/ http://bioinf.wehi.edu.au/software/MSigDB/", fname))
+  }
+  
+  printf("loading gene set file %s...\n", fname)
+  load(file.path("../ref/MSigDB", fname))
+}
+
+##merge hallmark and atlas pathways and remove uncertain gene sets
+selectedGeneSets <- c(Mm.H, Mm.c2[grepl("^(KEGG|BIOCARTA|PID|REACTOME)_", names(Mm.c2), perl=TRUE)])
+
+mart <- useMart("ensembl")
+mart <- useDataset("mmusculus_gene_ensembl", mart = mart)
+bm <- getBM(attributes=c('mgi_symbol', 'entrezgene'), mart = mart)
+bm <- bm[match(rownames(cmobj2), bm[,1]),]
+bm <- na.omit(bm)
+
+geneSets_idx <- ids2indices(selectedGeneSets, bm[,2])
+
+msigdbSetsGenes<-lapply(selectedGeneSets, function(s) na.omit(unique(bm[bm[,2] %in% s,1])))
+msigdbSets <- list(genes=msigdbSetsGenes, idx=geneSets_idx, description="MSigDB")
+
+save(file="../ref/MSigDB/selectedGeneSets.Rdata", msigdbSets, bm)
+save(msigdbSets, bm, file=file.path(clust_dir, "MSigDBselectedGeneSets.Rdata"))
+
+```

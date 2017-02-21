@@ -1,0 +1,55 @@
+---
+title: "oeHBCdiff DE"
+author: "Russell Fletcher and Diya Das"
+date: '`r Sys.Date()`'
+output:
+html_document:
+code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+  
+```{r options, echo=TRUE, results="markup",message=FALSE, error=FALSE}
+knitr::opts_chunk$set(cache=FALSE, fig.align="center", fig.width=10, error=TRUE,message=TRUE, echo=TRUE, warning=TRUE,results="markup")
+```
+
+```{r setup}
+
+colpal <- c("#1B9E77","antiquewhite2","cyan","#E7298A","#A6CEE3","#666666","#E6AB02","#FFED6F","darkorchid2","#B3DE69","#FF7F00","#A6761D","#1F78B4")   
+expt_str <- "oeHBCdiff"
+clust_dir <- "../output/clust/oeHBCdiff"
+viz_dir <- "../output/viz/oeHBCdiff"
+load(file.path(clust_dir, paste0(expt_str, "_slingshot.Rda")))
+
+clus.labels2 <- factor(clus.labels, levels=c("1" , "8", "5" , "3" ,"11" ,"15", "2", "14" ,"10" , "9" , "12","7" ,"4"))
+clusters <- clus.labels; clusters2 <- clus.labels2
+idx <- order(clus.labels2)
+```
+
+```{r GSEAbarplots}
+
+#######-----to plot barplots for the gene sets that are enriched by limma::romer GSEA by cell cluster
+
+###neuronal lineage clusters:1,8,5,3,2,14,10,9,12---->labeledinDE: 1,7,5,3,2,12,9,8,11
+###sus lineage clusters: 1,8,5,7,4--------->labeledinDE: 1,7,5,6,4
+###MV lineage clusters: 1,8,5,3,11,15-------->labeledinDE: 1,7,5,3,10,13
+
+##############------------to read all GSEA files and make the barplots:
+filenames <- list.files(paste0(clust_dir,"/romer"), pattern="*.txt", full.names=TRUE)
+ind <- sapply(filenames, function(m) as.numeric(unlist(strsplit(unlist(strsplit(m, ".txt")),"-X"))[2]))
+filenames <- filenames[order(ind)]
+gseaFiles <- lapply(filenames, read.delim) 
+
+gseaBarplots <- lapply(seq_along(gseaFiles), function(x) { 
+  curr_file <- gseaFiles[[x]]
+  curr_file <- curr_file[with(curr_file, order(Down)), ]
+  pdf(file=file.path(viz_dir,paste0(expt_str, "_gseaBarplots_",x,".pdf")),height=9,width=9)
+  par(mai=c(1.02,5,0.25,0.2))
+  
+  barplot(-log10(curr_file$Down[1:100]), horiz=T, names.arg=rownames(curr_file)[1:100],space=0.7,axis.lty=1, las=2,cex.names=0.5, xlab ="-log10 p-value",main=paste0("Gene Set Enrichment, cluster ",x), col=colpal[x])
+  dev.off()
+}) 
+
+```

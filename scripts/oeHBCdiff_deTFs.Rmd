@@ -1,0 +1,64 @@
+---
+title: "oeHBCdiff DE TF"
+author: "Russell Fletcher"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+  code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+  
+```{r options, echo=TRUE, results="markup",message=FALSE, error=FALSE}
+knitr::opts_chunk$set(cache=FALSE, fig.align="center", fig.width=10, error=TRUE,message=TRUE, echo=TRUE, warning=TRUE,results="markup")
+library(clusterExperiment)
+library(NMF)
+
+```
+
+### Set-up and Loading
+``` {r loading&set-up}
+
+expt_str <- "oeHBCdiff"
+
+clust_dir <- file.path("../output/clust", expt_str)
+viz_dir <- file.path("../output/viz", expt_str)
+DE_dir <- file.path("../output/DE", expt_str)
+
+load(file.path(clust_dir, paste0(expt_str,"_lineagedata.Rda")))
+load(file.path(DE_dir,"NL_SL_oneVall500DE_genes.Rda"))
+
+TFgenes <- intersect(unlist(read.table("../ref/ATFDB_mm_TF.txt")), rownames(nlm))
+
+```
+
+###DE Transcription Factors
+```{r deTFheatmaps}
+nldetf <- intersect(NL_DEgenes, TFgenes)
+sldetf <- intersect(SL_DEgenes, TFgenes)
+
+plotGeneSetHeatmapPT <- function(x, geneSet, clusters,colorVector, label) {
+  plotHeatmap(x[geneSet,], clusterSamples=FALSE,breaks=breakv, sampleData=data.frame(clusters=clusters), clusterLegend=list(clusters=colorVector),main=paste(label, "Lineage by Pseudotime",sep=" "))
+}
+  
+plotGeneSetHeatmapPT(nlm, nldetf, nlclusters, colpalN, label="DE TFs, Neuronal Lineage")
+plotGeneSetHeatmapPT(slm, sldetf, slclusters, colpalS, label="DE TFs, Sustentacular Lineage")
+
+save(nldetf, sldetf, file=file.path(DE_dir,"NL_SL_deTFs.Rda"))
+```
+
+### DE Transcription Factor Correlation Heatmaps for Neuronal and Sus Lineages
+```{r CorrelationHM}
+
+nldetfMat <- nlm[nldetf, ]
+sldetfMat<- slm[sldetf, ]
+ 
+corsNL <- cor(t(nldetfMat))
+corsSL <- cor(t(sldetfMat))
+
+aheatmap(corsNL, color = seqPal3)
+aheatmap(corsSL, color = seqPal3)
+
+```

@@ -1,0 +1,49 @@
+---
+title: "oeHBCdiff Cell Cycle Heatmaps"
+author: "Russell Fletcher"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+  code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+  
+```{r options, echo=TRUE, results="markup",message=FALSE, error=FALSE}
+knitr::opts_chunk$set(cache=FALSE, fig.align="center", fig.width=10, error=TRUE,message=TRUE, echo=TRUE, warning=TRUE,results="markup")
+library(clusterExperiment)
+NMF::nmf.options(grid.patch=TRUE)
+```
+
+###Set-up and Loading
+``` {r loading&set-up}
+
+expt_str <- "oeHBCdiff"
+
+clust_dir <- file.path("../output/clust", expt_str)
+viz_dir <- file.path("../output/viz", expt_str)
+DE_dir <- file.path("../output/DE", expt_str)
+
+load(file.path(clust_dir, paste0(expt_str,"_lineageData.Rda")))
+
+cc40 <- intersect(unlist(read.table ("../ref/cellCycle40.txt")),rownames(nlm))
+
+```
+
+###Cell Cycle Heatmaps
+##Neuronal and Sustentacular Cell Lineages
+##40 cell cycle genes (20 G1/S, 20 G2/M)
+```{r cellCycleHeatmaps}
+breakv <- c(min(nlm), seq(0, quantile(nlm[nlm > 0], .99, na.rm = TRUE), length = 50), max(nlm))
+plotGeneSetHeatmap_lineage <- function(x, geneSet, clusters,colorVector, lineage, label) {
+  pdf(file=file.path(viz_dir, paste0(expt_str, "_", lineage, "CellCycle.pdf")), width=11, height=8.5)
+  plotHeatmap(x[geneSet,], clusterSamples=FALSE,breaks=breakv, sampleData=data.frame(clusters=clusters), clusterLegend=list(clusters=colorVector),main=paste(label, "Lineage by Pseudotime",sep=" "))
+  dev.off()
+}
+
+plotGeneSetHeatmap_lineage(nlm, cc40, nclus.labels, colpalN, lineage="Neuronal", label="Cell Cycle, Neuronal Lineage")
+plotGeneSetHeatmap_lineage(slm, cc40, sclus.labels, colpalS, lineage="Sus",label="Cell Cycle, Sustentacular Lineage")
+
+```

@@ -1,0 +1,98 @@
+---
+title: "Gene Plots"
+author: "Russell Fletcher and Diya Das"
+date: '`r Sys.Date()`'
+output:
+html_document:
+code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+
+```{r options, echo=FALSE, results="hide",mesasge=FALSE, error=FALSE,include=FALSE}
+knitr::opts_chunk$set(fig.align="center", cache=TRUE, error=FALSE, message=FALSE, warning=FALSE, results="hide")
+
+library(clusterExperiment)
+library(RColorBrewer)
+
+colpalH <- c("#1B9E77","#A6CEE3","#E6AB02")
+expt_str <- "oeHBCdiff"
+
+clust_dir <- file.path("../output/clust", expt_str)
+viz_dir <- file.path("../output/viz", expt_str)
+
+load(file.path(clust_dir, paste0(expt_str,"_lineagedata.Rda")))
+load(file.path(clust_dir, paste0(expt_str,"_cmmerged.Rda")))
+
+```
+
+```{r singleGenePlotsInDevOrder}
+
+#####-----function for producing single gene expression plot in developmental order, using log2 transformed counts matrix
+singleGPlot <- function(matrix,geneList,clusters, colorVector,lineage){
+  geneList <- as.character(geneList)
+  for (i in seq_along(geneList)){
+    pdf(file=file.path(viz_dir,paste0(expt_str, "_", lineage,"_devOplot-",geneList[i],".pdf")),width=4.5, height=3)
+    plot(matrix[geneList[i],],col=colorVector[clusters],xlab=paste0(lineage," Lineage Developmental Order"), ylab="log2 counts" ,main=paste(lineage," Lineage,", geneList[i], sep=" "), pch=19)
+    lines(lowess(matrix[geneList[i],],f=0.15,delta=2),lwd=2)
+    dev.off()
+  }}
+
+###---Genes for plots in SF2 and SF6
+NLgenesToPlot <- c("Trp63", "Krt14", "Krt5", "Sfrp1", "Dkk3", "Tcf7l2", "Sp8")
+
+singleGPlot(nlm, NLgenesToPlot, nclus.labels, colpalN, "Neuronal")
+
+```
+
+
+```{r genePairsPlots}
+
+#####-----function for producing gene pairs plots of the HBC resting and transition states in SF2 (Trp63, Krt5, Krt14)
+
+cmobjHBC <- cmobj[,primaryClusterNamed(cmobj) %in% c("m1","m8","m5")]
+hbcCl <- droplevels(nclus.labels[colnames(cmobjHBC)])
+hbcD <- transform(cmobjHBC)
+
+HBCmarkers <- c("Trp63","Krt5","Krt14")
+
+pdf(file=file.path(viz_dir,paste0(expt_str, "_HBCgenePairsPlot.pdf")), width=9, height=9)
+pairs(t(hbcD[HBCmarkers,]), col=colpalH[hbcCl],pch=19)
+dev.off()
+
+```
+
+
+```{r twoGenePlots}
+
+devOvector <- rep("-1",462)
+TwoGenePlot <- function(x,y) {
+  pdf(file=file.path(viz_dir, paste0(expt_str, "_2Gplot_",x,"_",y,".pdf")), width=6, height=4.5)
+  plot(devOvector, col=colpalN[nclus.labels], xlab=paste0("Neuronal Lineage Developmental Order"), ylab="log2 counts",main=paste(x,"and",y, sep=" "),pch=19,ylim=c(-1,12))
+  lines(lowess(nlm[x,], f=0.11, delta=1),lwd=2, col="green1")
+  lines(lowess(nlm[y,], f=0.11, delta=1),lwd=2, col= "magenta")
+  dev.off()
+}
+
+TwoGenePlot("Ascl1","Top2a")
+TwoGenePlot("Hes6","Hmgb2")
+TwoGenePlot("Lhx2","Ascl1")
+TwoGenePlot("Neurod1","Ascl1")
+TwoGenePlot("Neurod1","Rbm24")
+TwoGenePlot("Mfng","Neurod1")
+TwoGenePlot("Neurod1","Baz1a")
+TwoGenePlot("Lhx2","Elavl4") 
+TwoGenePlot("Crabp1","Lhx2")
+TwoGenePlot("Tex15","Lhx2")
+TwoGenePlot("Tex15","Crabp1")
+TwoGenePlot("Gap43","Lhx2")
+TwoGenePlot("Gap43","Tex15")
+TwoGenePlot("Calb2","Gap43")
+TwoGenePlot("Gap43","Arhgdig")
+TwoGenePlot("Gap43","Omp")
+TwoGenePlot("Omp","Nrn1l")
+TwoGenePlot("Omp","Stoml3")
+
+```
