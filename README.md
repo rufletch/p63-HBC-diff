@@ -1,5 +1,5 @@
 # p63-HBC-diff
-Code and resources related to the olfactory HBC stem cell differentiation project
+Code and resources related to the olfactory epithelial HBC stem cell differentiation project (oeHBCdiff)
 
 Below are the R scripts for analyzing the single-cell RNA-seq data from differentiating HBC stem cells of the olfactory epithelium, presented in the following manuscript:
 Fletcher RB\*, Das D\*, Gadye L, Street KN, Baudhuin A, Wagner A, Cole MB, Flores Q, Choi YG, Yosef N, Purdom E, Dudoit S, Risso D, Ngai J. Deconstructing Olfactory Stem Cell Trajectories at Single Cell Resolution. *Submitted.* (\* co-first authors)
