@@ -1,0 +1,148 @@
+---
+title: "oeHBCdiff cluster plots"
+author: "Diya Das, Russell Fletcher"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+  code_folding: hide
+  toc: yes
+  toc_float: yes
+  fig_width: 10
+  fig_height: 10
+---
+```{r options, echo=TRUE, results="markup",message=FALSE, error=FALSE}
+knitr::opts_chunk$set(cache=FALSE, fig.align="center", fig.width=10, error=TRUE,message=TRUE, echo=TRUE, warning=TRUE,results="markup", eval=FALSE)
+library(slingshot)
+library(clusterExperiment)
+library(RColorBrewer)
+library(rgl)
+library(rglwidget)
+library(Rtsne)
+library(scales)
+library(ggplot2)
+NMF::nmf.options(grid.patch=TRUE)
+```
+
+## Setup
+```{r setup}
+expt_str <- "oeHBCdiff"
+clust_dir <- file.path("../output/clust", expt_str)
+viz_dir <- file.path("../output/viz", expt_str)
+
+load(file.path(clust_dir, paste0(expt_str, "_lineageData.Rda")))
+load(file.path(clust_dir, paste0(expt_str, "_cmmerged.Rda")))
+load(file.path(clust_dir, paste0(expt_str, "_slingshot.Rda")))
+
+cluster_ord <- c(1,8,5,3,11,15,2,14,10,9,12,7,4)
+allClus.labels <- clus.labels[order(match(clus.labels, cluster_ord))]
+
+
+cole <- c(brewer.pal(3, "Blues")[3], brewer.pal(5, "Reds"), brewer.pal(12, "Paired")[10])
+
+```
+
+## Visualizations
+
+### Heatmap of marker genes
+```{r heatmap}
+oe_markers <- intersect(unlist(read.table("../ref/oe_markers27.txt")),rownames(assay(cmobj)))
+breakv <- c(min(nlm), seq(0, quantile(nlm[nlm > 0], .99, na.rm = TRUE), length = 50), max(nlm))
+
+batch <- colData(cmobj)[names(allClus.labels),"batch"]
+expt <- colData(cmobj)[names(allClus.labels),"expt"]
+
+pdf(file=file.path(viz_dir,paste0(expt_str, "_selectmarker_65",Sys.Date(),".pdf")), width=6, height=5.5)
+plotHeatmap(transform(cmobj)[oe_markers, names(allClus.labels)], clusterSamples=FALSE, clusterFeatures=FALSE, breaks=breakv, sampleData=data.frame(cluster=allClus.labels, expt=expt, batch=batch), clusterLegend=list(cluster=colpal, expt=cole), annLegend=FALSE)
+dev.off()
+```
+
+### PCA pairs plot
+```{r pairs}
+pdf(file = file.path(viz_dir,paste0(expt_str,"_pairs.pdf")), width=8, height=8)
+pairs(X[,1:5], col=colpal[clus.labels],pch=19, xaxt='n',yaxt='n', asp=1, cex=0.5)
+legend("bottomright", levels(clus.labels), fill=colpal, cex=0.5, xpd=TRUE)
+dev.off()
+```
+### t-SNE
+```{r tsne}
+rtsne_fx <- function(cmobj, clusters,ngenes=500) {
+  set.seed(9887)
+  vars <- apply(transform(cmobj)[,names(clusters)], 1, var)
+  vars <- sort(vars, decreasing=TRUE)
+  var_data <- transform(cmobj)[names(vars)[1:ngenes],]
+  tsne_data <- Rtsne(t(var_data[,names(clusters)]), perplexity = 10, max_iter=1000)
+  return(tsne_data)
+}
+
+tsne_data <- rtsne_fx(cmobj,clus.labels,ngenes=500)
+```
+#### t-SNE by cluster
+```{r tsne-clus}
+svg(file.path(viz_dir,"oeHBCdiff_tsne_points_p10_500genes.svg"), width=3.25,height=3.25)
+par(mar=c(2,2,1,1), mfrow=c(1,1))
+plot(tsne_data$Y, col=colpal[clus.labels], pch=19, xaxt='n',yaxt='n',cex=0.5,ylab=)
+mtext(side = 1,'Component 1', line=0.5); mtext(side=2,'Component 2', line=0.5)
+legend("bottomleft", levels(clus.labels), fill=colpal, cex=.8,ncol=3)
+dev.off()
+
+svg(file.path(viz_dir,"oeHBCdiff_tsne_medoids_p10_500genes.svg"), width=3.25,height=3.25)
+par(mar=c(2,2,1,1), mfrow=c(1,1))
+plot(tsne_data$Y, col=alpha(colpal[clus.labels],0.1), pch=19, xaxt='n',yaxt='n',cex=0.5,ylab='',xlab='')
+centers <- t(sapply(levels(clus.labels),function(clID){
+  x.sub <- tsne_data$Y[clus.labels == clID,]
+  return(matrixStats::colMedians(x.sub))
+}))
+center.col <- sapply(levels(clus.labels),function(clID){
+  colpal[clus.labels][which.max(clus.labels == clID)]
+})
+points(centers, cex = 1, pch=19,col = center.col)
+dev.off()
+```
+
+#### t-SNE by experimental condition (timepoint)
+```{r tsne-expt}
+wtcols <- suppressWarnings(brewer.pal(length(grep("K5ERRY", levels(expt)))+2, "Blues")[-(1:2)])
+kocols <- suppressWarnings(brewer.pal(length(grep("KO", levels(expt))), "Reds"))
+socols <- suppressWarnings(brewer.pal(12, "Paired")[10])
+cols <- c(wtcols, kocols, socols)
+
+svg(file.path(viz_dir,"oeHBCdiff_tsne_expt_p10_500genes_4_2.svg"), width=6)
+layout(matrix(c(1:8), 4, 2, byrow=TRUE), widths = rep(lcm(3.8), 4), heights = rep(lcm(3.8), 3))
+par.defaultmar = c(5.1, 4.1, 4.1, 2.1)
+par(mar=c(0.5, 0.5, 0.5, 0.5), oma=c(0, 0, 0, 0))
+for (i in 1:nlevels(expt)){
+  plot(tsne_data$Y, col=alpha("grey", 0.5), pch=19, xlab="", ylab='', xaxt='n', yaxt='n', cex=1)
+  points(tsne_data$Y[expt==levels(expt)[i],], cex=1, col=cols[i], pch=19)
+}
+plot(tsne_data$Y, col=alpha(cols[expt], 0.5), pch=19, xlab="", ylab='', xaxt='n', yaxt='n', cex=1)
+#plot.new()
+#legend("topleft", rep('',nlevels(expt)), fill=cols, cex=1.4, bty='n')
+#par(mar=par.defaultmar)
+#mtext("Component 1", side=1, line = 0.5, outer=TRUE)
+#mtext("Component 2", side=2, line = 0.5, outer=TRUE, las=0)
+dev.off()
+```
+
+### Cluster and timepoint composition - bubble charts
+```{r bubble}
+exptbyclus <- reshape2::melt(prop.table(table(Condition=factor(expt, levels=rev(levels(expt))), Cluster=clus.labels), 1), value.name="Percent")
+exptbyclus$Cluster <- factor(exptbyclus$Cluster, levels=cluster_ord)
+
+clusbyexpt <- reshape2::melt(prop.table(table(Condition=factor(expt,levels=rev(levels(expt))),Cluster=clus.labels),2),value.name="Percent")
+clusbyexpt$Cluster <- factor(clusbyexpt$Cluster, levels=cluster_ord)
+
+t1 <- theme(plot.background=element_blank(), panel.grid.minor=element_blank(), panel.border=element_blank(), panel.background=element_blank(), axis.line=element_blank(),axis.ticks=element_blank(), legend.title=element_blank(), legend.background=element_blank(), axis.text.x=element_blank(), axis.text.y=element_blank(),legend.key= element_rect(fill="white"))
+t2 <- theme(axis.title.x=element_blank(), axis.title.y=element_blank(),  plot.title=element_blank(),legend.text=element_blank())
+
+svg(file.path(viz_dir,"oeHBCdiff_exptbyclus.svg"),width=12)
+exptbyclus.plt <- ggplot(exptbyclus, aes(Cluster, Condition, size=ifelse(Percent==0, NA, Percent)))
+exptbyclus.plt + t1 + t2 + geom_point(color = "slategrey") + scale_size_area(max_size=20, name=NULL, breaks=c(0.25, 0.5, 0.75)) + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(size=0.1, color="black"))
+dev.off()
+
+svg(file.path(viz_dir,"oeHBCdiff_clusbyexpt.svg"),width=12)
+clusbyexpt.plt <- ggplot(clusbyexpt, aes(Cluster, Condition, size=ifelse(Percent==0, NA, Percent)))
+clusbyexpt.plt + t1 + t2 + geom_point(color = "slategrey") + scale_size_area(max_size=20, name=NULL, breaks=c(0.25, 0.5, 0.75)) + theme(panel.grid.major.y = element_blank(), panel.grid.major.x = element_line(size=0.1, color="black"))
+dev.off()
+```
+
+
