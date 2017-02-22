@@ -1,0 +1,139 @@
+---
+title: "oeHBCdiff developmental order plots"
+author: "Diya Das, Russell Fletcher"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+  code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+
+```{r options, echo=TRUE, results="markup",message=FALSE, error=FALSE}
+knitr::opts_chunk$set(cache=FALSE, fig.align="center", fig.width=10, error=TRUE,message=TRUE, echo=TRUE, warning=TRUE,results="markup", eval=FALSE)
+library(slingshot)
+library(clusterExperiment)
+library(RColorBrewer)
+library(rgl)
+library(rglwidget)
+library(Rtsne)
+library(scales)
+library(ggplot2)
+```
+
+## Setup
+```{r setup}
+expt_str <- "oeHBCdiff"
+clust_dir <- file.path("../output/clust", expt_str)
+viz_dir <- file.path("../output/viz", expt_str)
+
+load(file.path(clust_dir, paste0(expt_str, "_lineageData.Rda")))
+load(file.path(clust_dir, paste0(expt_str, "_slingshot.Rda")))
+load(file.path(clust_dir, paste0(expt_str, "_cmmerged.Rda")))
+
+cole <- c(brewer.pal(3, "Blues")[3], brewer.pal(5, "Reds"), brewer.pal(12, "Paired")[10])
+oclus.labels <- cmobj@clusterMatrix[,"combineMany"]
+names(oclus.labels) <- colnames(cmobj)
+oclus.labels <- factor(oclus.labels[names(clus.labels)])
+ocolpal <-c(colpal,"springgreen1", "darkolivegreen","darksalmon","darkred")
+```
+
+## Visualizations
+
+### PCA by cluster, 2D and 3D
+```{r pca}
+# 2D
+pdf(file = file.path(viz_dir,"oeHBCdiff_2D_cluster.pdf"), width=8, height=8)
+pairs(X[,1:5], col=alpha(colpal[as.factor(clus.labels)],1),pch=19, xaxt='n', yaxt='n', asp=1, cex=0.5)
+dev.off()
+
+#3D
+dplot <- c(1:3)
+centers <- t(sapply(rownames(lineages$forest),function(clID){
+  x.sub <- X[clus.labels == clID,dplot]
+  return(colMeans(x.sub))
+}))
+center.col <- sapply(rownames(lineages$forest),function(clID){
+  colpal[as.factor(clus.labels)][which.max(clus.labels == clID)]
+})
+
+
+plot3d(X[,dplot], t='p', col=colpal[as.factor(clus.labels)],alpha=0.7, pch = 19, cex = 2, size=8, xlab="PC 1", ylab="PC 2", zlab="PC 3", aspect="iso", box=FALSE, axes=FALSE)
+axes3d(tick=FALSE)
+par3d(windowRect = c(20, 30, 800, 800))
+rgl.postscript(file.path(viz_dir,"oeHBCdiff_3D_cluster.svg"), fmt="svg")
+rglwidget()
+
+plot3d(X[,dplot], t='p', col=colpal[as.factor(clus.labels)],alpha=0.2, pch = 19, cex = 2, size=8, xlab="PC 1", ylab="PC 2", zlab="PC 3", aspect="iso", box=FALSE, axes=FALSE)
+axes3d(tick=FALSE)
+par3d(windowRect = c(20, 30, 800, 800))
+for (i in seq_along(curves)){
+  plot3d(curves[[i]]$s[order(curves[[i]]$lambda),dplot], type='l',add=TRUE, lwd=2,col=colpal[which.max(tail(lineages[[i]],1)==levels(clus.labels))])
+}
+plot3d(centers, size = 20, add = TRUE, pch=1, col = colpal)
+rgl.postscript(file.path(viz_dir,paste0("oeHBCdiff_3D_slingshot.svg")), fmt="svg")
+rglwidget()
+try(rgl.close())
+```
+
+### Developmental order dot plots
+```{r dotplot}
+for (i in 1:length(curves)){
+  linedf <- data.frame(pseudotime = curves[[i]]$pseudotime, clus.labels = clus.labels, samples=rownames(X), expt=expt)
+  linedf$sox2 <- linedf$expt %in% levels(linedf$expt)[7]
+  linedf <- linedf[with(linedf, order(pseudotime)), ]
+  
+  medoids <- sapply(levels(linedf$clus.labels),function(clID){
+    x.sub <- linedf$pseudotime[linedf$clus.labels == clID]
+    col <- colpal[linedf$clus.labels][which.max(linedf$clus.labels==clID)]
+    return(list(means = mean(x.sub, na.rm=TRUE), sdev= sd(x.sub, na.rm=TRUE), col=col))
+  })
+  means = unlist(medoids["means",])
+  sdev = unlist(medoids["sdev",])
+  col = unlist(medoids["col",])
+
+  svg(file.path(viz_dir, paste0(expt_str, "_Lineage", i, "_", Sys.Date(), ".svg")),width=6, height=2)
+  par(mfrow=c(3, 1),mar=c(1, 1, 1, 1))
+  plot(linedf$pseudotime,rep(0, length(linedf$pseudotime)),cex=3,axes=F, pch=16, xlab='', ylab='', col=alpha(colpal[linedf$clus.labels],0.5), ylim=c(-0.1, 0.1), xlim = range(linedf$pseudotime, na.rm=TRUE)); abline(h=0, col=alpha("black", 0.5))
+  points(x=means,y=rep(0.07, length(means)), col=col, pch=19)
+  arrows(means-sdev, rep(0.07, length(means)), means+sdev, rep(0.07, length(means)), length=0.05, angle=90, code=3, col=col)
+  #legend("left", levels(linedf$clus.labels), fill=col, cex=0.5, xpd=TRUE, inset=c(-0.12,0.1))
+  
+  plot(linedf$pseudotime[!linedf$sox2],rep(0, sum(!linedf$sox2)),cex=3,axes=F, pch=16, xlab='', ylab='', col=alpha(cole[linedf$expt[!linedf$sox2]], 0.5), ylim=c(-0.1, 0.1), xlim = range(linedf$pseudotime, na.rm=TRUE)); abline(h=0, col=alpha("black", 0.5))
+ plot(linedf$pseudotime[linedf$sox2],rep(0, sum(linedf$sox2)),cex=3,axes=F, pch=16, xlab='', ylab='', col=alpha(cole[linedf$expt[linedf$sox2]], 0.5), ylim=c(-0.1, 0.1), xlim = range(linedf$pseudotime, na.rm=TRUE)); abline(h=0, col=alpha("black", 0.5))
+  #legend("left", levels(as.factor(expt)), fill=col, cex=0.5, xpd=TRUE, inset=c(-0.12,0.1))
+  dev.off()
+}
+```
+
+```{r dotplot_original}
+for (i in 1:length(curves)){
+  linedf <- data.frame(pseudotime = curves[[i]]$pseudotime, oclus.labels = oclus.labels, samples=rownames(X), expt=expt)
+  linedf$sox2 <- linedf$expt %in% levels(linedf$expt)[7]
+  linedf <- linedf[with(linedf, order(pseudotime)), ]
+  
+  medoids <- sapply(levels(linedf$oclus.labels),function(clID){
+    x.sub <- linedf$pseudotime[linedf$oclus.labels == clID]
+    col <- ocolpal[linedf$oclus.labels][which.max(linedf$oclus.labels==clID)]
+    return(list(means = mean(x.sub, na.rm=TRUE), sdev= sd(x.sub, na.rm=TRUE), col=col))
+  })
+  means = unlist(medoids["means",])
+  sdev = unlist(medoids["sdev",])
+  col = unlist(medoids["col",])
+
+  svg(file.path(viz_dir, paste0(expt_str, "_orig_Lineage", i, "_", Sys.Date(), ".svg")),width=6, height=2)
+  par(mfrow=c(3, 1),mar=c(1, 1, 1, 1))
+  plot(linedf$pseudotime,rep(0, length(linedf$pseudotime)),cex=3,axes=F, pch=16, xlab='', ylab='', col=alpha(ocolpal[linedf$oclus.labels],0.5), ylim=c(-0.1, 0.1), xlim = range(linedf$pseudotime, na.rm=TRUE)); abline(h=0, col=alpha("black", 0.5))
+  points(x=means,y=rep(0.07, length(means)), col=col, pch=19)
+  arrows(means-sdev, rep(0.07, length(means)), means+sdev, rep(0.07, length(means)), length=0.05, angle=90, code=3, col=col)
+  #legend("left", levels(linedf$oclus.labels), fill=col, cex=0.5, xpd=TRUE, inset=c(-0.12,0.1))
+  
+  plot(linedf$pseudotime[!linedf$sox2],rep(0, sum(!linedf$sox2)),cex=3,axes=F, pch=16, xlab='', ylab='', col=alpha(cole[linedf$expt[!linedf$sox2]], 0.5), ylim=c(-0.1, 0.1), xlim = range(linedf$pseudotime, na.rm=TRUE)); abline(h=0, col=alpha("black", 0.5))
+ plot(linedf$pseudotime[linedf$sox2],rep(0, sum(linedf$sox2)),cex=3,axes=F, pch=16, xlab='', ylab='', col=alpha(cole[linedf$expt[linedf$sox2]], 0.5), ylim=c(-0.1, 0.1), xlim = range(linedf$pseudotime, na.rm=TRUE)); abline(h=0, col=alpha("black", 0.5))
+  #legend("left", levels(as.factor(expt)), fill=col, cex=0.5, xpd=TRUE, inset=c(-0.12,0.1))
+  dev.off()
+}
+```
+
