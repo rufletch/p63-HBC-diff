@@ -1,0 +1,92 @@
+---
+title: "oeHBCdiff slingshot"
+author: "Diya Das"
+date: '`r Sys.Date()`'
+output:
+html_document:
+code_folding: hide
+toc: yes
+toc_float: yes
+fig_width: 10
+fig_height: 10
+---
+
+```{r options, echo=TRUE, results="markup",message=FALSE, error=FALSE}
+knitr::opts_chunk$set(cache=FALSE, fig.align="center", fig.width=10, error=TRUE,message=TRUE, echo=TRUE, warning=TRUE,results="markup")
+library(slingshot);library(clusterExperiment);library(RColorBrewer)
+```
+
+```{r setup}
+expt_str <- "oeHBCdiff"
+nrmstr <- "none_fq_qc1_nobio_nobatch"
+
+Eh <-'1'    # resting HBCs
+En <- '12'  # mature neurons
+Esus <- '4'  # mature Sustentacular cells
+
+clust_dir = file.path("../output/clust/", expt_str)
+colpal <- c("#1B9E77","antiquewhite2","cyan","#E7298A","#A6CEE3","#666666","#E6AB02","#FFED6F","darkorchid2","#B3DE69","#FF7F00","#A6761D","#1F78B4")      
+```
+
+### Merging clusters
+```{r merge}
+load(file.path(clust_dir, paste0(expt_str,"_", nrmstr,"_cm_all_cons.Rda")))
+cmobj <- makeDendrogram(cm2,dimReduce="var",ndims=1000)
+cmobj <- mergeClusters(cmobj, mergeMethod="adjP", plotType="mergeMethod", cutoff=0.045)
+```
+
+### Dropping clusters
+```{r drop}
+mergeCl <- primaryCluster(cmobj)
+drop_cl <- as.numeric(names(table(mergeCl)[table(mergeCl) < 10]))
+keepcl <- !(mergeCl %in% c(drop_cl,-1))
+
+pcax <- prcomp(t(transform(cmobj)[,keepcl]))
+clus.labels <- factor(mergeCl[keepcl]) 
+X <- pcax$x  
+expt <- droplevels(colData(cmobj)$expt[keepcl])
+names(expt) <- names(clus.labels) <- rownames(X)
+```
+
+### Slingshot calculations
+```{r slingshot}
+n <- 5; sval <- 0
+lineages <- get_lineages(X[,1:n], clus.labels, start.clus = Eh, end.clus = c(En,Esus))
+for (i in 1:ncol(lineages$C)) {print(lineages[[i]])}
+curves <- get_curves(X[,1:n], clus.labels, lineages, extend="y", stretch=1, shrink = sval, reweight = FALSE, drop.multi = FALSE)
+
+save(lineages, curves, X, clus.labels, expt, file=file.path(clust_dir,paste0(expt_str, "_slingshot.Rda")))
+```
+
+```{r lineagedata}
+nlm <- transform(cmobj)[,rownames(X)[order(curves[[1]]$pseudotime, na.last = NA)]]
+mlm <- transform(cmobj)[,rownames(X)[order(curves[[2]]$pseudotime, na.last = NA)]]
+slm <- transform(cmobj)[,rownames(X)[order(curves[[3]]$pseudotime, na.last = NA)]]
+
+table(clus.labels[colnames(nlm)])
+table(clus.labels[colnames(mlm)])
+table(clus.labels[colnames(slm)])
+table(clus.labels)
+
+nclus.labels <- droplevels(clus.labels[colnames(nlm)])
+mclus.labels <- droplevels(clus.labels[colnames(mlm)])
+sclus.labels <- droplevels(clus.labels[colnames(slm)])
+
+names(curves[[1]]$pseudotime) <- names(curves[[2]]$pseudotime) <- names(curves[[3]]$pseudotime) <- rownames(X)
+
+NLdevOrd <- sort(curves[[1]]$pseudotime, na.last = NA)
+MLdevOrd <- sort(curves[[2]]$pseudotime, na.last = NA)
+SLdevOrd <- sort(curves[[3]]$pseudotime, na.last = NA)
+
+colpalN <- colpal[c(1:3,5,7:9,11:12)]
+colpalM <- colpal[c(1,3,5,7,10,13)]
+colpalS <- colpal[c(1,4:7)]
+
+save(nlm, mlm, slm, 
+     nclus.labels, mclus.labels, sclus.labels, clus.labels, NLdevOrd, MLdevOrd, SLdevOrd,
+     colpalN, colpalM, colpalS, colpal,
+     file=file.path(clust_dir, paste0(expt_str, "_lineageData.Rda"))
+)
+
+save(cmobj, file=file.path(clust_dir, paste0(expt_str, "_cmmerged.Rda")))
+```
