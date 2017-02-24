@@ -1,0 +1,13 @@
+1	#1B9E77
+2	antiquewhite2
+3	cyan
+4	#E7298A
+5	#A6CEE3
+6	#666666
+7	#E6AB02
+8	#FFED6F
+9	darkorchid2
+10	#B3DE69
+11	#FF7F00
+12	#A6761D
+13	#1F78B4
