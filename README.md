@@ -13,7 +13,7 @@ We created a number of visualizations based on clustering, experimental conditio
 
 
 ### Create output directories and add to .gitignore
-In project directory, run `mkdir output/{clust, data, gClust, romer, viz, DE, EDA}/oeHBCdiff`, and add new directories to `.gitignore`. Place the scripts in the 'scripts' directory and the initial eSet 'data' in the data directory.
+In project directory, run `mkdir -p output/{clust,data,gClust,romer,viz,DE,EDA}/oeHBCdiff`, and add new directories to `.gitignore`. Place the scripts in the 'scripts' directory and the initial eSet 'data' in the data directory.
 
 ### Filtering and Normalization
 `oeHBCdiff_1_filt_norm.sh` performs the following analyses, by calling various R scripts (given in parentheses):
