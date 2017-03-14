@@ -4,6 +4,7 @@ Code and resources related to the olfactory epithelial HBC stem cell differentia
 Below are the R scripts for analyzing the single-cell RNA-seq data from differentiating HBC stem cells of the olfactory epithelium, presented in the following manuscript:
 Fletcher RB\*, Das D\*, Gadye L, Street KN, Baudhuin A, Wagner A, Cole MB, Flores Q, Choi YG, Yosef N, Purdom E, Dudoit S, Risso D, Ngai J. Deconstructing Olfactory Stem Cell Trajectories at Single Cell Resolution. *Submitted.* (\* co-first authors)
 
+The data are available on GEO in [GSE95601](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE95601).
 
 The repository currently has scripts that take as input Expression Set data and perform a series of computations, interspersed with visualizations. First, the data are filtered for poor quality cells and less informative genes. The data are normalized, and biological contaminants and known doublets (based on co-expression of differentiated cell markers) are removed. Then, the data are re-filtered and re-normalized.
 
