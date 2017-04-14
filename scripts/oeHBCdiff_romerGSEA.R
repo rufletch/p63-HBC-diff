@@ -1,3 +1,7 @@
+#title: GSEA of oeHBCdiff Data Using ROMER
+#author: Russell Fletcher and Davide Risso
+#date: January 30th 2017
+
 rm(list=ls()); options(getClass.msg=FALSE)
 
 library(biomaRt)
