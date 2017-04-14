@@ -1,3 +1,7 @@
+#title: Filtering Poor Quality Samples
+#author: Diya Das and Russell Fletcher
+#date: January 30th 2017
+
 rm(list=ls()); options(getClass.msg=FALSE)
 library(scone)
 library(Biobase)
