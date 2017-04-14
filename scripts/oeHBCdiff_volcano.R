@@ -1,4 +1,4 @@
-#title: Differentially Expressed Transcription Factor Heatmaps
+#title: Volcano Plots of Differentially Expressed Genes
 #author: Diya Das
 #date: January 30th 2017
 
