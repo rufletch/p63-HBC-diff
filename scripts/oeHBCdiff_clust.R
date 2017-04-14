@@ -1,4 +1,4 @@
-#title: Clustering of oeHBCdiff samples
+#title: Clustering of oeHBCdiff Samples
 #author: Diya Das and Russell Fletcher
 #date: January 30th 2017
 
