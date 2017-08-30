@@ -11,7 +11,7 @@ The repository currently has scripts that take as input Expression Set data and 
 
 After filtering and normalization, we clustered the data using clusterExperiment, performed developmental ordering and inferred lineage trajectories and branching with slingshot. For each lineage, differentially expressed genes were identified and then clustered to reveal coordinated gene expression. We used Gene Set Enrichment Analysis to infer pathways regulating cell fates and transitions.
 
-We created a number of visualizations based on clustering, experimental condition, and developmental order. We displayed coordinated and correlated differentially expressed genes including transcription factors, as well as a set of cell cycle genes and selected regulators of cell fate transitions along each lineage. The olfactory receptors and factors associated with OR regulation were plotted along the neuronal lineage. We also presented the top enriched gene sets for each cell cluster. 
+We created a number of visualizations based on clustering, experimental condition, and developmental order. We displayed coordinated and correlated differentially expressed genes including transcription factors, as well as a set of cell cycle genes and selected regulators of cell fate transitions along each lineage. The olfactory receptors (OR) and factors associated with OR regulation were plotted along the neuronal lineage. We also presented the top enriched gene sets for each cell cluster. 
 
 
 ### Create output directories and add to .gitignore
@@ -56,7 +56,7 @@ In project directory, run `mkdir -p output/{clust,data,gClust,romer,viz,DE,EDA}/
 16. Olfactory Receptor (OR) gene and OR regulation associated gene expression plots (`oeHBCdiff_OR.R`)
 
 ### Wnt Pathway Visualization in Figure 6
-PathVisio (Version 3.2.4, pathvisio.org) was used to display differential gene expression for Wnt pathway members expressed in the HBCs.  To reproduce this plot, download and install PathVisio and follow the instructions. 
+PathVisio (Version 3.2.4, pathvisio.org) was used to display differential gene expression for Wnt pathway members expressed in the HBCs.  To reproduce this plot, download and install PathVisio and follow the instructions below. 
 
 Download the Mm_Derby_Ensembl_85.bridge gene reference data via the downloads link at pathvisio.org. The Mm_Wnt_Signaling_Pathway_and_Pluripotency_WP723_89312.gpml pathway from the wikipathways_Mus_musculus_Curation-AnalysisCollection (available from the pathvisio.org download link) was used as a starting point. This pathway was modified to only include genes present in our data set after gene filtering. Then select genes were removed and added to focus the pathway on canonical Wnt signaling and to include relevant factors for our experiment. The genes in the pathway were colored by differential expression (log2FC) for the HBCs (cluster 1) relative to all other clusters. 
 
