@@ -65,6 +65,6 @@ The input DE data (HBConeVsAllDE_WntSigPath.txt) and the modified pathway (WntPa
 
 ### Dependencies/useful R packages:
 
-- SCONE (normalization): https://github.com/YosefLab/scone
-- clusterExperiment (clustering): https://github.com/epurdom/clusterExperiment
-- slingshot (lineage trajectory algorithm): https://github.com/kstreet13/slingshot
+- SCONE (normalization), Version 0.0.7: https://github.com/YosefLab/scone
+- clusterExperiment (clustering), Version 0.99.3-9001: http://bioconductor.org/packages/release/bioc/html/clusterExperiment.html, https://github.com/epurdom/clusterExperiment
+- Slingshot (lineage trajectory algorithm), Version 0.0.0.9005: https://github.com/kstreet13/slingshot
